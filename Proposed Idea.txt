@@ -1,0 +1,8 @@
+1. The task: 3D Gaussian Splatting (3DGS) builds a 3D model of a scene from photos, but it needs to know where each photo was taken (the camera pose).
+2. The problem: with only a few photos (3–9), the classic tool COLMAP often fails to find these camera poses.
+3. The current solution: AI models like MASt3R (used in InstantSplat) predict the camera poses and a 3D point cloud, then correct the poses during training.
+4. The gap: VGGT-X tested parts of this (pose correction on/off, AI points vs random points), but only with many photos (dense views). We did not find any study that separates the AI poses, the AI 3D points, and the pose correction with only 3–9 photos.
+5. Our method: we use the existing InstantSplat code and change one part at a time. We give it reference poses (computed by COLMAP from all photos of the dataset), replace the AI points with random points (the same number of points, spread evenly inside the scene's box), or turn pose correction off.
+6. The setup: we test this on the Mip-NeRF 360 dataset (8 scenes) with 3, 6 and 9 photos, using only the training photos and the same test-pose alignment for every configuration. We measure image quality (PSNR, SSIM, LPIPS), pose error and training time.
+7. The result: a clear answer to which part matters most, how this changes with the number of photos, and whether the dense-view findings of VGGT-X still hold with only 3–9 photos.
+8. The type of work: an AI analysis (ablation) study of an existing method, not a new algorithm and not AR/MR, doable in about one month on the RTX 5090.
