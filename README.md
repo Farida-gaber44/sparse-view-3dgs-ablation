@@ -16,5 +16,5 @@ Separating the roles of predicted camera poses, predicted 3D points and pose ref
 - `3 - Presentation (15 slides).pptx` - slides for the supervisor
 - `4 - Project Tracker (Day by Day).xlsx` - tasks per person per day
 - `Proposed Idea.txt` - the idea in 8 lines
-- `prompt for Research tools.txt` - prompt used for the novelty search
+
 

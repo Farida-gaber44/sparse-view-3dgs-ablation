@@ -6,3 +6,5 @@ outputs/
 360_v2/
 *.pth
 *.ckpt
+claude.md
+prompt for Research tools.txt
