@@ -24,6 +24,6 @@ Separating the roles of predicted camera poses, predicted 3D points and pose ref
 - `scripts/pose_error.py` - our camera-pose error (ATE, rotation, RPE); `python scripts/pose_error.py --selftest`
 
 ## Status
-- Block 1 done (9 Nov): baseline reproduces Free360 within 0.6 dB PSNR (milestone M1 passed). See `LOG.md`.
+- Block 1 (9-11 Nov), in progress: main result done - baseline reproduces Free360 within 0.6 dB PSNR (milestone M1 passed). Still open: notebook v2 re-run, Mona runs the notebook, Overleaf + Zotero, hand-off call. See `LOG.md`.
 
 
