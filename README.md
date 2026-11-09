@@ -14,7 +14,15 @@ Separating the roles of predicted camera poses, predicted 3D points and pose ref
 - `Related work/` - novelty check PDF + Elicit and Consensus results (what is already published)
 - `2 - Research Proposal (Detailed).pdf` - full proposal, tools, CPU/GPU
 - `3 - Presentation (15 slides).pptx` - slides for the supervisor
-- `4 - Project Tracker (Day by Day).xlsx` - tasks per person per day
+- `4 - Project Tracker (Day by Day).xlsx` - tasks per person per day (workstation plan)
+- `5 - Project Tracker (Colab version).xlsx` - the same plan on free Colab (9-25 Nov) - **the one we follow**
 - `Proposed Idea.txt` - the idea in 8 lines
+- `LOG.md` - what was done, results and decisions (start here)
+- `notebooks/01_block1_setup_baseline.ipynb` - Colab notebook: setup + baseline (Run all)
+- `notebooks/run_outputs/` - saved copies of finished notebook runs (with outputs)
+- `scripts/pose_error.py` - our camera-pose error (ATE, rotation, RPE); `python scripts/pose_error.py --selftest`
+
+## Status
+- Block 1 done (9 Nov): baseline reproduces Free360 within 0.6 dB PSNR (milestone M1 passed). See `LOG.md`.
 
 
