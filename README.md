@@ -3,28 +3,43 @@
 **What Makes AI-Based Sparse-View 3D Gaussian Splatting Work?**
 Separating the roles of predicted camera poses, predicted 3D points and pose refinement.
 
-**Team:** Farida Gaber, Mona Yasser | **Supervisor:** Dr. Wedad Sallam | **Deadline:** 25 Nov 2026
+**Team:** Farida Gaber, Mona Yasser · **Supervisor:** Dr. Wedad Sallam · **Deadline:** 25 Nov 2026
 
-## Idea in 3 lines
-- 3D Gaussian Splatting needs camera poses; with 3-9 photos, COLMAP often fails.
-- InstantSplat uses an AI model (MASt3R) for poses and 3D points, then refines the poses.
+## Links
+| What | Link |
+|---|---|
+| Live tracker (Google Sheet) - update task status here | [Project Tracker](https://docs.google.com/spreadsheets/d/1JH4ZOhLBre2fi6JLzDMeKQmHHIarsd1svu3o1-JARoo/edit) |
+| Shared Google Drive folder - setup files, dataset copy, all results | [3dgs-project](https://drive.google.com/drive/folders/1VXgL1JKVs8lrfZSx1xRJKzLIpw3f48NM?usp=drive_link) |
+| Latest progress report (start here if you are new) | [4-reports/Report.pdf](4-reports/Report.pdf) |
+| Project log - every result and decision | [LOG.md](LOG.md) |
+
+## The idea in 3 lines
+- 3D Gaussian Splatting needs camera poses; with only 3-9 photos, the classic tool (COLMAP) often fails.
+- InstantSplat uses an AI model (MASt3R) for the poses and 3D points, then refines the poses during training.
 - We change one part at a time (reference poses, random points, refinement off) on Mip-NeRF 360 to see which part matters most.
 
-## Files
-- `Related work/` - novelty check PDF + Elicit and Consensus results (what is already published)
-- `2 - Research Proposal (Detailed).pdf` - full proposal, tools, CPU/GPU
-- `3 - Presentation (Progress update).pptx` - 20 slides for the supervisor: proposal + first results (9 Nov)
-- `4 - Project Tracker (Day by Day).xlsx` - tasks per person per day (workstation plan)
-- **Live tracker (Google Sheet, update statuses here):** https://docs.google.com/spreadsheets/d/1JH4ZOhLBre2fi6JLzDMeKQmHHIarsd1svu3o1-JARoo/edit
-- `5 - Project Tracker (Colab version).xlsx` - backup copy of the live tracker (9-25 Nov plan on Colab); may lag behind the Google Sheet
-- `6 - Progress Report 1 - Related Work, Setup and Baseline Results (3-9 Nov).pdf` - 6-page progress report with links, related work: what was done, first results, next steps (for anyone new to the project)
-- `Proposed Idea.txt` - the idea in 8 lines
-- `LOG.md` - what was done, results and decisions (start here)
-- `notebooks/01_block1_setup_baseline.ipynb` - Colab notebook: setup + baseline (Run all)
-- `notebooks/run_outputs/` - saved copies of finished notebook runs (with outputs)
-- `scripts/pose_error.py` - our camera-pose error (ATE, rotation, RPE); `python scripts/pose_error.py --selftest`
+## Folders
+| Folder | Contents |
+|---|---|
+| [`1-proposal/`](1-proposal) | The idea in 8 lines, detailed research proposal (PDF) |
+| [`2-related-work/`](2-related-work) | Novelty check and literature review (PDF), Elicit and Consensus search results |
+| [`3-planning/`](3-planning) | Backup of the live tracker (Colab plan, 9-25 Nov); old workstation plan (not used) |
+| [`4-reports/`](4-reports) | Progress report 1 (3-9 Nov: related work, setup, baseline results) and the presentation for the supervisor |
+| [`notebooks/`](notebooks) | Colab notebook (`01_block1_setup_baseline.ipynb`) and saved runs with outputs (`run_outputs/`) |
+| [`scripts/`](scripts) | `pose_error.py` - our camera-pose error (ATE, rotation, RPE) |
+| [`assets/`](assets) | Images used in documents |
 
-## Status
-- Block 1 (9-11 Nov), in progress: main result done - baseline reproduces Free360 within 0.6 dB PSNR (milestone M1 passed). Still open: notebook v2 re-run, Mona runs the notebook, Overleaf + Zotero, hand-off call. See `LOG.md`.
+## How to run (Google Colab)
+1. Open `notebooks/01_block1_setup_baseline.ipynb` in Colab and set `Runtime -> Change runtime type -> T4 GPU`.
+2. `Runtime -> Run all`. Results are saved to the shared Drive folder after every run; finished runs are skipped on restart.
+3. Check the pose-error script anywhere: `python scripts/pose_error.py --selftest`
 
-
+## Status (9 Nov)
+| Block | Dates | Lead | Status |
+|---|---|---|---|
+| B0 Related work + research gap | 3-6 Nov | Farida | Done |
+| B1 Setup + baseline | 9-11 Nov | Farida | Main result done (baseline within 0.6 dB of Free360, milestone M1 passed); 4 small items open |
+| B2 Switches C1, C2, C4 + pilot | 12-15 Nov | Mona | Next |
+| B3 All 96 runs, tables, figures | 16-18 Nov | Both | Planned |
+| B4 Analysis + paper draft | 19-23 Nov | Mona | Planned |
+| Final: supervisor feedback, delivery | 24-25 Nov | Both | Planned |
