@@ -23,7 +23,7 @@ Separating the roles of predicted camera poses, predicted 3D points and pose ref
 |---|---|
 | [`1-proposal/`](1-proposal) | The idea in 8 lines, detailed research proposal (PDF) |
 | [`2-related-work/`](2-related-work) | Novelty check and literature review (PDF), Elicit and Consensus search results |
-| [`3-tracker/`](3-tracker) | Link to the live Google Sheet tracker + offline backup copy |
+| [`3-tracker/`](3-tracker) | Link to the live Google Sheet tracker |
 | [`4-reports/`](4-reports) | Progress report 1 (3-9 Nov: related work, setup, baseline results) and the presentation for the supervisor |
 | [`notebooks/`](notebooks) | Colab notebook (`01_block1_setup_baseline.ipynb`) and saved runs with outputs (`run_outputs/`) |
 | [`scripts/`](scripts) | `pose_error.py` - our camera-pose error (ATE, rotation, RPE) |
