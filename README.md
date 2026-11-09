@@ -15,7 +15,8 @@ Separating the roles of predicted camera poses, predicted 3D points and pose ref
 - `2 - Research Proposal (Detailed).pdf` - full proposal, tools, CPU/GPU
 - `3 - Presentation (Progress update).pptx` - 20 slides for the supervisor: proposal + first results (9 Nov)
 - `4 - Project Tracker (Day by Day).xlsx` - tasks per person per day (workstation plan)
-- `5 - Project Tracker (Colab version).xlsx` - the same plan on free Colab (9-25 Nov) - **the one we follow**
+- **Live tracker (Google Sheet, update statuses here):** https://docs.google.com/spreadsheets/d/1JH4ZOhLBre2fi6JLzDMeKQmHHIarsd1svu3o1-JARoo/edit
+- `5 - Project Tracker (Colab version).xlsx` - backup copy of the live tracker (9-25 Nov plan on Colab); may lag behind the Google Sheet
 - `Proposed Idea.txt` - the idea in 8 lines
 - `LOG.md` - what was done, results and decisions (start here)
 - `notebooks/01_block1_setup_baseline.ipynb` - Colab notebook: setup + baseline (Run all)
