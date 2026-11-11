@@ -22,6 +22,7 @@ import json
 import os
 import shutil
 import subprocess
+import tempfile
 import threading
 import time
 from dataclasses import dataclass, field
@@ -48,6 +49,39 @@ class Context:
     test_stride: int = 8
     seed: int = 0
     reuse: dict = field(default_factory=lambda: {"C3": "C3_baseline"})   # finished baseline runs count as C3
+    use_init_cache: bool = True      # reuse the saved MASt3R output (init_geo) for every config of a scene/photo count
+
+
+# ----------------------------------------------------------------- MASt3R output cache (saves GPU time)
+# init_geo.py writes everything into <scene>/sparse_<n> (poses, points, confidences, test-pose start).
+# Its output is the same for C1-C4, so we run it ONCE per scene x photo count and keep a copy on Drive.
+# The switches (C1, C4) change only the local copy, after it has been restored.
+def init_cache_dir(ctx, scene, n_views):
+    return f"{ctx.drive}/init_cache/{scene}/{n_views}_views"
+
+
+def save_init_cache(ctx, scene, n_views, init_seconds):
+    src = Path(ctx.data) / scene / f"sparse_{n_views}"
+    assert (src / "0" / "points3D.ply").exists(), f"no init_geo output in {src}"
+    d = init_cache_dir(ctx, scene, n_views)
+    os.makedirs(d, exist_ok=True)
+    tmp = os.path.join(tempfile.gettempdir(), f"init_{scene}_{n_views}.tar")
+    subprocess.run(["tar", "-cf", tmp, "-C", str(src.parent), src.name], check=True)
+    shutil.copy(tmp, f"{d}/sparse.tar.part")
+    os.replace(f"{d}/sparse.tar.part", f"{d}/sparse.tar")
+    os.remove(tmp)
+    json.dump({"init_geo_seconds": init_seconds, "instantsplat_commit": ctx.commit, "gpu": ctx.gpu,
+               "date": datetime.datetime.now().isoformat(timespec="seconds")}, open(f"{d}/info.json", "w"), indent=1)
+
+
+def restore_init_cache(ctx, scene, n_views):
+    """Return the original init_geo seconds if the cache was restored, else None."""
+    d = init_cache_dir(ctx, scene, n_views)
+    if not (ctx.use_init_cache and os.path.exists(f"{d}/sparse.tar") and os.path.exists(f"{d}/info.json")):
+        return None
+    shutil.rmtree(f"{ctx.data}/{scene}/sparse_{n_views}", ignore_errors=True)
+    subprocess.run(["tar", "-xf", f"{d}/sparse.tar", "-C", f"{ctx.data}/{scene}"], check=True)
+    return json.load(open(f"{d}/info.json"))["init_geo_seconds"]
 
 
 # ----------------------------------------------------------------- the switches
@@ -142,7 +176,7 @@ def run_one(ctx, config, scene, n_views, force=False, dry_run=False):
             print(f"   [{name}] {cmd}")
         return None
 
-    shutil.rmtree(f"{src}/sparse_{n_views}", ignore_errors=True)   # init_geo writes here; start clean
+    shutil.rmtree(f"{src}/sparse_{n_views}", ignore_errors=True)   # init_geo writes here; start clean (or restore cache)
     shutil.rmtree(model, ignore_errors=True)
     os.makedirs(model, exist_ok=True)
     os.makedirs(drive_dir, exist_ok=True)
@@ -150,8 +184,14 @@ def run_one(ctx, config, scene, n_views, force=False, dry_run=False):
     sampler = VramSampler()
     sampler.start()
     stage_s, switch_info, t_all = {}, {}, time.time()
+    init_cached = restore_init_cache(ctx, scene, n_views)
     try:
         for name, cmd in steps:
+            if name == "init_geo" and init_cached is not None:
+                stage_s[name] = 0.0
+                print(f"   init_geo     from Drive cache (originally {init_cached:.0f} s)")
+                switch_info = cfg["after_init"](ctx, scene, n_views, model) or {}
+                continue
             t0 = time.time()
             log = f"{model}/{name}.log"
             with open(log, "w") as lf:
@@ -162,6 +202,8 @@ def run_one(ctx, config, scene, n_views, force=False, dry_run=False):
                 tail = "".join(open(log).readlines()[-25:])
                 raise RuntimeError(f"Stage '{name}' failed for {config}/{scene}/{n_views}. Last lines:\n{tail}")
             if name == "init_geo":
+                if ctx.use_init_cache:
+                    save_init_cache(ctx, scene, n_views, stage_s[name])      # BEFORE any switch changes it
                 switch_info = cfg["after_init"](ctx, scene, n_views, model) or {}
     finally:
         sampler.stop_flag = True
@@ -188,6 +230,8 @@ def run_one(ctx, config, scene, n_views, force=False, dry_run=False):
                   **{k: pe_after[k] for k in POSE_KEYS},
                   **{k + "_init": pe_before[k] for k in POSE_KEYS},
                   pose_metric="pose_error.py", train_images=names, switch_info=switch_info,
+                  init_from_cache=init_cached is not None,
+                  init_geo_seconds=init_cached if init_cached is not None else stage_s.get("init_geo"),
                   n_test_images=len(list(renders.glob("*"))),
                   stage_seconds=stage_s, total_seconds=round(time.time() - t_all, 1),
                   peak_vram_mb=sampler.peak, gpu=ctx.gpu, resolution=ctx.res_dir, iterations=ctx.iters,
