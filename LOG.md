@@ -76,3 +76,30 @@
 - Everything restored from Drive: cached GPU programs, dataset copy, photo lists identical to notebook 01, MASt3R output from `init_cache` (0 s instead of 70 s). No download, no rebuild.
 - C2 (refinement off) on garden, 3 photos: PSNR 14.56 (C3: 14.67), camera poses unchanged during training (max change 0.00) -> switch S2 works. Run time 8.2 min (C3 run: 9.3 min).
 - Peak GPU memory in runs that reuse the MASt3R output is ~1.2 GB; the MASt3R step itself needs 3.2-4.9 GB (baseline runs). `aggregate.py` reports time including the MASt3R step (`total_seconds_incl_init`) so costs stay comparable, and counts `C3_baseline` runs as C3.
+
+## 2026-11-12 - Independent audit of all work + fixes (Farida)
+
+Read-only review (own checks + a second reviewer + the Free360 paper), then fixes. No GPU used.
+
+**Verified correct**
+- Pose-error maths and camera order; split patch (same rule in init_geo.py and metrics.py; test = every 8th photo = 3DGS split, which Free360 says it follows); aligned test-camera start (maths, and it is the method Free360 describes in Appendix B.1: rigid registration at the training viewpoints + 500 test-time pose steps).
+- No test photo reaches training; C2 really freezes the poses; the MASt3R cache is safe and C2/C3 of garden/bonsai start from identical MASt3R output.
+- All reported averages and differences recompute exactly; Free360 Table 1 InstantSplat numbers confirmed verbatim.
+
+**Problems found -> fixed**
+- InstantSplat version was not pinned (Colab cloned the latest code) -> pinned to b951567 in setup and checked before every batch.
+- Camera-position error (ATE) is not comparable across photo counts (same true error gives ATE 0.036 with 3 cameras vs 0.073 with 9) -> compare ATE only within the same photo count (tables are per photo count); rotation error and relative error reported too.
+- With 3 cameras close to a line, centre-only alignment invents rotation error (7.6 deg median with perfect rotations) -> pose_error v2 adds short camera-axis points to the alignment (0.5 deg; single-camera errors still measured correctly). All finished runs are recomputed from their saved poses (no retraining).
+- The package list was overwritten every session -> one dated file per session (`Drive/env/`), and its name is stored in every result.
+- Small code issues fixed: unwritten switches are skipped before any GPU work; the MASt3R cache checks the InstantSplat version and that its photos match the manifest; tables take the configuration from the folder name; effects show spread and in how many scenes they agree.
+
+**Camera check (real reference positions)**
+- Several captures go around the object many times (bicycle ~5 laps, garden ~6, stump ~7, treehill ~6). InstantSplat's rule (photos evenly spaced by photo NUMBER) can then give one-sided sets: 3 photos cover only 17 deg of bicycle, 45 deg of room, 84 deg of garden; other scenes are well spread. Decision: keep the rule (standard, same photos for every configuration, so the ablation stays fair); record the coverage of every scene (`Drive/views_coverage.json`) and report it as a limitation / use it in the analysis.
+- The suspected first/last-photo duplicates do not exist (captures are not closed loops), so no protocol change and no re-run were needed. bonsai's 6.8 deg rotation error at 3 photos is a real MASt3R error (cameras well spread).
+
+**Decisions and caveats for the paper**
+- Resolution: we use images_8 for all scenes; Free360 used "double the official 3DGS factor" (= images_8 outdoor, images_4 indoor). Kept for time; reported as a deviation. Internal comparisons are unaffected.
+- M1 is "consistent with" Free360, not a strict reproduction: 2 vs 8 scenes, indoor resolution differs, Free360's InstantSplat probably started from DUSt3R (we use MASt3R), and Free360 states 10x smaller test-pose learning rates than InstantSplat's code.
+- The same 6 baseline runs scored higher on 12 Nov than on 9 Nov in 6/6 cases (+0.02 to +0.26 dB, mean +0.13): run-to-run noise and/or Colab software changes. Rules from now on: run all configurations of a scene in the same session; treat differences < ~0.3 dB as noise unless repeated (3 repeats of key runs).
+- C1 gets an exact test-camera start (reference poses) - report as a limitation. Refinement is nearly inactive at InstantSplat's default pose learning rate - conclusions about RQ3 hold for the default settings.
+- Design notes for the C1 and C4 switches are in notebook 02 (frame/scale, files to rewrite, focal length, per-point confidence).
