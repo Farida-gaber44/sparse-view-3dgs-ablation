@@ -30,15 +30,15 @@ We change one part at a time and keep everything else fixed.
 - **Scale:** 4 configurations × 3 photo counts × 8 scenes = 96 runs on Google Colab (T4 GPU).
 
 ## Results so far
-Our baseline (C3) reproduces the published InstantSplat numbers from Free360 (milestone M1 passed):
+Our baseline (C3, full InstantSplat; re-run 12 Nov with the final protocol) is consistent with the InstantSplat numbers published by Free360 (milestone M1):
 
-| Photos | Our PSNR | Free360 PSNR | Difference |
+| Photos | Our PSNR (garden + bonsai) | Free360 PSNR (8 scenes) | Difference |
 |---|---|---|---|
-| 3 | 14.70 | 14.10 | +0.60 |
-| 6 | 16.39 | 15.83 | +0.56 |
-| 9 | 17.19 | 17.16 | +0.03 |
+| 3 | 14.72 | 14.10 | +0.62 |
+| 6 | 16.61 | 15.83 | +0.78 |
+| 9 | 17.34 | 17.16 | +0.18 |
 
-Two problems in the original code were found and fixed (test-camera initialization and pose-error measurement). Details in the [progress report](4-reports/Report.pdf) and [project log](LOG.md).
+Caveats: 2 vs 8 scenes, Free360 used a higher resolution for indoor scenes, and run-to-run noise is about 0.3 dB. An independent audit (12 Nov) verified the code and fixed the protocol issues it found. Details in the [project log](LOG.md).
 
 ## Repository structure
 | Folder | Contents |
@@ -46,7 +46,7 @@ Two problems in the original code were found and fixed (test-camera initializati
 | [`1-proposal`](1-proposal) | Project idea and detailed research proposal |
 | [`2-related-work`](2-related-work) | Literature review, novelty check, Elicit and Consensus search results |
 | [`3-tracker`](3-tracker) | Link to the live task tracker |
-| [`4-reports`](4-reports) | Progress report and presentation |
+| [`4-reports`](4-reports) | Progress report, presentation, and the Block 2 handover for Mona (step by step) |
 | [`notebooks`](notebooks) | Colab notebook for setup and experiments, plus saved runs |
 | [`scripts`](scripts) | `pose_error.py` – camera-pose error with self-test |
 | [`assets`](assets) | Figures used in documents |
