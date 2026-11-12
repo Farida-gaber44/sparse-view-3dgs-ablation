@@ -42,3 +42,32 @@
 **Still open (Block 1)**
 - Share the Drive folder `3dgs-project` with Mona (Editor); Mona runs the notebook once on her account (M1.1).
 - Overleaf + Zotero; DPR-Splat PDF.
+
+## 2026-11-12 - Block 1 main work finished (Farida): baseline re-run with valid pose error; batch tools ready (F4.1)
+
+**Baseline C3 re-run with notebook v2** (same settings; Colab T4; 86.9 min for 6 runs)
+
+| Scene | Photos | PSNR | SSIM | LPIPS | ATE before -> after refinement | Rotation error before -> after (deg) | Time (min) |
+|---|---|---|---|---|---|---|---|
+| garden | 3 | 14.67 | 0.274 | 0.555 | 0.019 -> 0.018 | 1.09 -> 1.11 | 9.3 |
+| garden | 6 | 17.85 | 0.364 | 0.392 | 0.026 -> 0.026 | 1.33 -> 1.32 | 12.4 |
+| garden | 9 | 18.13 | 0.351 | 0.379 | 0.020 -> 0.019 | 0.75 -> 0.75 | 16.3 |
+| bonsai | 3 | 14.77 | 0.362 | 0.577 | 0.107 -> 0.106 | 6.84 -> 6.83 | 9.8 |
+| bonsai | 6 | 15.37 | 0.397 | 0.504 | 0.078 -> 0.078 | 4.51 -> 4.55 | 15.3 |
+| bonsai | 9 | 16.55 | 0.444 | 0.446 | 0.138 -> 0.138 | 2.23 -> 2.24 | 20.7 |
+
+- Mean PSNR 14.72 / 16.61 / 17.34 at 3 / 6 / 9 photos vs Free360 14.10 / 15.83 / 17.16 -> **M1 still passed** (within 0.8 dB).
+- Run-to-run variation vs the 9 Nov runs: +0.02 to +0.27 dB PSNR (training is random) -> seed repeats are worth keeping.
+- ATE = camera-position error divided by the scene size (0.02 = 2 %). `pose_error.py` validated on real data: garden training cameras within ~1 deg, as found on 9 Nov.
+- **First observation for RQ3:** pose refinement barely changes the training poses (all changes < 0.05 deg). bonsai (indoor) starts with larger errors (up to 6.8 deg at 3 photos) and refinement does not reduce them.
+- Mean time per run 14.0 min -> 96 runs ~22.4 GPU-hours on the T4.
+
+**Saved on Drive so nothing is repeated**
+- `data/mipnerf360_8scenes_images_8.tar` (779 MB): dataset copy -> no 12 GB download in later sessions (F2.2 done).
+- `init_cache/<scene>/<n>_views/`: MASt3R output (init_geo) for garden + bonsai x 3/6/9 (29-90 MB each). The MASt3R step is identical for C1-C4, so it runs once per scene x photo count and is reused (saves ~1-2 min per run, ~1.5 GPU-h over the batch, and every config starts from exactly the same AI output).
+- Results, logs, test renders and camera poses of every run.
+
+**Batch tools (F4.1)**
+- `scripts/run_all.py`: config x scene x photos loop, result after every run, skips finished runs, reuses `C3_baseline` as C3, MASt3R cache. C2 = training without `--optim_pose` (InstantSplat then keeps the poses fixed; checked in train.py). C1 / C4 hooks are left for Block 2.
+- `scripts/aggregate.py`: all_runs.csv, means_by_config.csv, effects.csv (RQ1 = C1-C2, RQ2 = C3-C4, RQ3 = C3-C2, matched scenes only); self-test passes.
+- `scripts/colab_prepare.py` + `notebooks/02_experiments.ipynb`: experiments notebook that restores everything from Drive. Notebook 01 stays as the one-time setup + baseline.
