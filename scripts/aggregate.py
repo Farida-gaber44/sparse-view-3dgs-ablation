@@ -20,6 +20,7 @@ from pathlib import Path
 
 CONFIGS = ["C1", "C2", "C3", "C4", "C5"]
 ALIASES = {"C3_baseline": "C3"}      # baseline runs of notebook 01 = C3 with the same settings
+# ate is only comparable between runs with the SAME photo count (tables are always per photo count)
 METRICS = ["psnr", "ssim", "lpips", "ate", "rot_deg", "rpe_deg", "ate_init", "rot_deg_init",
            "total_seconds_incl_init", "total_seconds", "peak_vram_mb"]
 EFFECTS = [("RQ1 poses (C1 - C2)", "C1", "C2"),
@@ -35,7 +36,11 @@ def load(results_root):
         r = json.load(open(f))
         if r.get("pose_metric") != "pose_error.py":
             continue                                   # old runs without a valid pose error
-        c = r.get("config")
+        c = f.parts[-4]                                # config = FOLDER name (a renamed/old folder is never used)
+        if r.get("config") not in (c, None) and not (c in CONFIGS and r.get("config") in ALIASES):
+            print(f"WARNING: {f} says config {r.get('config')} but is in folder {c} - folder name used")
+        if r.get("pose_error_version", 1) < 2:
+            print(f"WARNING: {f} has pose error version 1 - run recompute_pose_error first")
         if c in ALIASES:
             r = dict(r, config=ALIASES[c], source_config=c)
             target = aliased
@@ -78,10 +83,14 @@ def tables(rows):
                 common = sorted(set(sa) & set(sb))
                 if not common:
                     continue
-                row = {"effect": name, "n_views": v, "n_scenes": len(common)}
-                for m in ["psnr", "ssim", "lpips", "ate", "rot_deg"]:
+                row = {"effect": name, "n_views": v, "n_scenes": len(common), "scenes": " ".join(common)}
+                for m in ["psnr", "ssim", "lpips", "rot_deg", "rpe_deg", "ate"]:
                     d = [sa[s][m] - sb[s][m] for s in common if sa[s].get(m) is not None and sb[s].get(m) is not None]
                     row[f"d_{m}"] = mean(d)
+                    if m == "psnr":
+                        # spread over scenes and how many scenes agree on the sign: a mean alone can hide noise
+                        row["sd_psnr"] = (sum((x - row["d_psnr"]) ** 2 for x in d) / (len(d) - 1)) ** 0.5 if len(d) > 1 else None
+                        row["scenes_positive_psnr"] = f"{sum(x > 0 for x in d)}/{len(d)}"
                 effects.append(row)
     return list(means.values()), effects
 
@@ -109,7 +118,9 @@ def main(results_root):
         print(f"  {m['config']} {m['n_views']} photos ({m['n_scenes']} scenes): PSNR {m['psnr']:.2f}  "
               f"ATE {m['ate']:.3f}  rot {m['rot_deg']:.2f} deg")
     for e in effects:
-        print(f"  {e['effect']} at {e['n_views']} photos ({e['n_scenes']} scenes): dPSNR {e['d_psnr']:+.2f}")
+        sd = f", sd {e['sd_psnr']:.2f}" if e.get("sd_psnr") is not None else ""
+        print(f"  {e['effect']} at {e['n_views']} photos ({e['n_scenes']} scenes): dPSNR {e['d_psnr']:+.2f}{sd}, "
+              f"positive in {e['scenes_positive_psnr']} scenes")
     return rows, means, effects
 
 
@@ -120,7 +131,7 @@ def selftest():
             p.mkdir(parents=True)
             json.dump(dict(config=c, scene=s, n_views=v, psnr=psnr, ssim=0.3, lpips=0.5, ate=ate, rot_deg=rot,
                            rpe_deg=1, ate_init=ate * 2, rot_deg_init=rot * 2, total_seconds=600, peak_vram_mb=4000,
-                           pose_metric=pm, date="x"), open(p / "result.json", "w"))
+                           pose_metric=pm, pose_error_version=2, date="x"), open(p / "result.json", "w"))
         for s, base in [("garden", 15.0), ("bonsai", 14.0)]:
             put("C1", s, 3, base + 2.0, ate=0.0, rot=0.0)
             put("C2", s, 3, base)
@@ -131,9 +142,11 @@ def selftest():
         put("C2", "kitchen", 3, 12.0)
         put("C3", "room", 3, 50.0, pm=None)               # old format, must be ignored
         put("C4", "stump", 3, 10.0)                       # only in C4: must not enter the C3-C4 effect
+        put("C3_baseline_OLD_interp_init", "bonsai", 3, 1.0)   # renamed old folder: must never be used
         rows, means, effects = main(d)
         assert len(rows) == 11, len(rows)
         assert not any(r["psnr"] == 99.0 for r in rows), "baseline copy must not replace a real C3 run"
+        assert not any(r["psnr"] == 1.0 for r in rows), "renamed old folder must be ignored"
         e = {x["effect"]: x for x in effects}
         r3 = e["RQ3 refinement (C3 - C2)"]
         assert r3["n_scenes"] == 3 and abs(r3["d_psnr"] - (0.5 + 0.5 + 1.0) / 3) < 1e-9, r3
