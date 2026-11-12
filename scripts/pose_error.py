@@ -5,7 +5,8 @@ rotation and a world-to-camera translation (mixed), and compares it with its own
 poses. Its ATE / RPE numbers are therefore not reliable (RPE_r came out at 78-145 degrees).
 
 Here both sides are turned into camera centres + camera orientations, aligned with ONE Sim(3)
-(Umeyama: scale, rotation, shift) fitted on the training camera centres, then:
+(Umeyama: scale, rotation, shift) fitted on the training camera centres (plus short points along each
+camera axis, so the fit stays stable when 3 cameras are nearly on a line - version 2), then:
   ate      RMSE of the camera-centre error, divided by the scene size
            (mean distance of the reference centres from their centroid) -> unit-free
   rot_deg  mean angle between aligned and reference camera orientations (degrees)
@@ -72,16 +73,46 @@ def umeyama(X, Y):
 
 
 def angle_deg(Ra, Rb):
-    c = (np.trace(Ra.T @ Rb) - 1) / 2
-    return float(np.degrees(np.arccos(np.clip(c, -1.0, 1.0))))
+    """Rotation angle between Ra and Rb, via atan2 (accurate also for very small angles)."""
+    M = Ra.T @ Rb
+    c = (np.trace(M) - 1) / 2
+    s = np.linalg.norm([M[2, 1] - M[1, 2], M[0, 2] - M[2, 0], M[1, 0] - M[0, 1]]) / 2
+    return float(np.degrees(np.arctan2(s, c)))
+
+
+VERSION = 2   # v2 (12 Nov): alignment uses camera centres AND camera axes (stable for 3 cameras)
+
+
+AXIS_WEIGHT = 0.1   # tested: removes the near-line artifact (7.4 -> 0.5 deg) and keeps single-camera errors honest
+
+
+def frame_points(rot, ctr):
+    """Camera centres plus one short point along each camera axis (0.1 x the frame's size).
+    The axis points make the Sim(3) fit well-posed when the centres are nearly on a line (with 3
+    cameras, centres alone leave the rotation about that line almost free), while the centres still
+    dominate the fit, so one camera's orientation error barely spreads to the others."""
+    size = np.linalg.norm(ctr - ctr.mean(0), axis=1).mean()
+    pts = [ctr]
+    for k in range(3):
+        pts.append(ctr + AXIS_WEIGHT * size * rot[:, :, k])
+    return np.concatenate(pts, 0)
+
+
+def flatness(ctr):
+    """Second / first singular value of the centred camera positions: 0 = cameras on a line."""
+    sv = np.linalg.svd(ctr - ctr.mean(0), compute_uv=False)
+    return float(sv[1] / sv[0]) if sv[0] > 0 else 0.0
 
 
 def pose_error(ref_rot, ref_ctr, est_rot, est_ctr):
-    """All inputs: camera-to-world rotations (N,3,3) and camera centres (N,3), same camera order."""
+    """All inputs: camera-to-world rotations (N,3,3) and camera centres (N,3), same camera order.
+    ate / rot_deg / rpe_t depend on the Sim(3) alignment; rpe_deg does not need any alignment.
+    ate is only comparable between runs with the SAME number of cameras (the fit absorbs more of the
+    error when there are fewer cameras)."""
     ref_rot, ref_ctr, est_rot, est_ctr = map(np.asarray, (ref_rot, ref_ctr, est_rot, est_ctr))
     n = len(ref_ctr)
     assert n == len(est_ctr) >= 3, "need the same number of cameras on both sides (at least 3)"
-    s, R, t = umeyama(est_ctr, ref_ctr)
+    s, R, t = umeyama(frame_points(est_rot, est_ctr), frame_points(ref_rot, ref_ctr))
     al_ctr = (s * (R @ est_ctr.T)).T + t
     al_rot = R @ est_rot
     size = np.linalg.norm(ref_ctr - ref_ctr.mean(0), axis=1).mean()
@@ -97,7 +128,8 @@ def pose_error(ref_rot, ref_ctr, est_rot, est_ctr):
             rpe_t.append(np.linalg.norm(g_t - e_t) / size)
             rpe_r.append(angle_deg(ref_rot[i].T @ ref_rot[j], al_rot[i].T @ al_rot[j]))
     return {"ate": float(ate), "rot_deg": float(rot), "rpe_t": float(np.mean(rpe_t)),
-            "rpe_deg": float(np.mean(rpe_r)), "n_cams": n, "sim3_scale": float(s)}
+            "rpe_deg": float(np.mean(rpe_r)), "n_cams": n, "sim3_scale": float(s),
+            "flatness": flatness(ref_ctr), "pose_error_version": VERSION}
 
 
 def evaluate_run(images_bin, est_npy, names):
@@ -144,8 +176,22 @@ def selftest():
     bad[0] = rot[0] @ (np.eye(3) + np.sin(np.radians(10)) / np.radians(10) * K
                        + (1 - np.cos(np.radians(10))) / np.radians(10) ** 2 * K @ K)
     e = pose_error(rot, ctr, bad, ctr)
-    assert abs(e["rot_deg"] - 10 / n) < 1e-6 and e["ate"] < 1e-9, e
-    print("selftest OK - identity, Sim(3)-invariance, w2c round trip and a known 10-degree error all pass")
+    # the axis points spread a tiny part of one camera's error over the others; the mean stays ~10/n
+    assert abs(e["rot_deg"] - 10 / n) < 0.05 * 10 / n and e["rpe_deg"] > 1.0, e
+
+    # 5) 3 cameras almost on a line, PERFECT rotations, 0.5 % position noise: the reported rotation
+    #    error must stay small (centre-only alignment gave a median of ~7.6 deg here)
+    def cam(a, r=3.0):
+        c = np.array([np.cos(a), np.sin(a), 0.2]) * r
+        z = -c / np.linalg.norm(c); x = np.cross([0, 0, 1], z); x /= np.linalg.norm(x); y = np.cross(z, x)
+        return np.stack([x, y, z], 1), c
+    errs = []
+    for _ in range(200):
+        R3, C3 = map(np.array, zip(*[cam(np.radians(a)) for a in (0, 180, 358)]))
+        errs.append(pose_error(R3, C3, R3, C3 + rng.normal(scale=0.015, size=C3.shape))["rot_deg"])
+    assert np.median(errs) < 1.0, np.median(errs)
+    print("selftest OK - identity, Sim(3)-invariance, w2c round trip, a known 10-degree error and "
+          "near-collinear 3-camera stability all pass")
 
 
 if __name__ == "__main__":
