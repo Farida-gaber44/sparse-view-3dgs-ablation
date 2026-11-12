@@ -19,6 +19,7 @@ never applied twice):
 """
 import json
 import os
+import numpy as np
 import re
 import struct
 import subprocess
@@ -44,6 +45,19 @@ def check_gpu():
     return name
 
 
+INSTANTSPLAT_COMMIT = "b951567"   # every run of the study uses this exact version
+
+
+def pin_commit(repo, commit=INSTANTSPLAT_COMMIT):
+    """Make sure the cloned InstantSplat is exactly the pinned version (GitHub may move on)."""
+    head = sh(f"cd {repo} && git rev-parse --short HEAD").strip()
+    if not head.startswith(commit[:7]):
+        sh(f"cd {repo} && git fetch -q origin && git checkout -q {commit} && git submodule update -q --init --recursive")
+        head = sh(f"cd {repo} && git rev-parse --short HEAD").strip()
+    assert head.startswith(commit[:7]), f"InstantSplat is at {head}, expected {commit}"
+    return head
+
+
 def install(drive, repo):
     """Run the setup script saved by notebook 01 (cached GPU programs -> about 1-3 minutes)."""
     quick = subprocess.run(["python", "-c", "import diff_gaussian_rasterization, simple_knn, fused_ssim, open3d"],
@@ -53,7 +67,7 @@ def install(drive, repo):
         if not os.path.exists(setup):
             raise SystemExit("setup_colab.sh is not on Drive. Run notebook 01 once on this account first.")
         print(sh(f"bash {setup}")[-300:])
-    return sh(f"cd {repo} && git rev-parse --short HEAD").strip()
+    return pin_commit(repo)
 
 
 def restore_data(drive, data, scenes, res_dir="images_8"):
@@ -195,3 +209,33 @@ def build_manifest(data, scenes, views, res_dir="images_8", test_stride=8, drive
                             assert old[s]["train_images"][str(v)] == manifest[s]["train_images"][str(v)], \
                                 f"{s} {v} views: training photos changed!"
     return manifest
+
+
+# ----------------------------------------------------------------- where the training cameras are
+def camera_coverage(data, manifest, scenes, views, drive=None):
+    """For each scene x photo count: how the training cameras are spread around the scene.
+    span_deg  = largest arc covered around the scene (360 = all sides); a small value means one-sided views
+    flatness  = 2nd / 1st singular value of the camera positions (0 = on a line; low values make 3-camera
+                alignment less reliable)
+    The photo choice is InstantSplat's rule (evenly spaced by photo number). Several outdoor captures go
+    around the object many times, so this can give one-sided sets (e.g. bicycle 3 photos)."""
+    from pose_error import read_images_bin, w2c_to_cam
+    out = {}
+    for s in scenes:
+        ref = read_images_bin(f"{data}/{s}/sparse/0/images.bin")
+        allc = np.array([w2c_to_cam(*ref[n])[1] for n in sorted(ref)])
+        mu = allc.mean(0)
+        _, _, vt = np.linalg.svd(allc - mu)
+        az = lambda c: float(np.degrees(np.arctan2((c - mu) @ vt[1], (c - mu) @ vt[0])) % 360)
+        out[s] = {}
+        for v in views:
+            names = manifest[s]["train_images"][str(v)]
+            c = np.array([w2c_to_cam(*ref[n])[1] for n in names])
+            a = sorted(az(x) for x in c)
+            gaps = [(a[(i + 1) % len(a)] - a[i]) % 360 for i in range(len(a))]
+            sv = np.linalg.svd(c - c.mean(0), compute_uv=False)
+            out[s][str(v)] = {"azimuths_deg": [round(x) for x in a], "span_deg": round(360 - max(gaps)),
+                              "flatness": round(float(sv[1] / sv[0]), 3)}
+    if drive:
+        json.dump(out, open(f"{drive}/views_coverage.json", "w"), indent=1)
+    return out
