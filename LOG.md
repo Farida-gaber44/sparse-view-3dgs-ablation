@@ -71,3 +71,8 @@
 - `scripts/run_all.py`: config x scene x photos loop, result after every run, skips finished runs, reuses `C3_baseline` as C3, MASt3R cache. C2 = training without `--optim_pose` (InstantSplat then keeps the poses fixed; checked in train.py). C1 / C4 hooks are left for Block 2.
 - `scripts/aggregate.py`: all_runs.csv, means_by_config.csv, effects.csv (RQ1 = C1-C2, RQ2 = C3-C4, RQ3 = C3-C2, matched scenes only); self-test passes.
 - `scripts/colab_prepare.py` + `notebooks/02_experiments.ipynb`: experiments notebook that restores everything from Drive. Notebook 01 stays as the one-time setup + baseline.
+
+**End-to-end test of notebook 02 (12 Nov, fresh Colab session)**
+- Everything restored from Drive: cached GPU programs, dataset copy, photo lists identical to notebook 01, MASt3R output from `init_cache` (0 s instead of 70 s). No download, no rebuild.
+- C2 (refinement off) on garden, 3 photos: PSNR 14.56 (C3: 14.67), camera poses unchanged during training (max change 0.00) -> switch S2 works. Run time 8.2 min (C3 run: 9.3 min).
+- Peak GPU memory in runs that reuse the MASt3R output is ~1.2 GB; the MASt3R step itself needs 3.2-4.9 GB (baseline runs). `aggregate.py` reports time including the MASt3R step (`total_seconds_incl_init`) so costs stay comparable, and counts `C3_baseline` runs as C3.
